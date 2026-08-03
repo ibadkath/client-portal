@@ -46,6 +46,23 @@ accounts (password `password123` for all):
 | `client@acme.test` | client | Acme Corp |
 | `client@globex.test` | client | Globex Inc |
 
+## Seeing realtime sync
+
+`milestones`, `comments`, and `deliverables` are the tables wired into Supabase
+Realtime — changes broadcast live to every open session scoped to the same org (RLS
+applies to realtime too, so a client only ever sees their own org's changes). To see it:
+
+1. Open two sessions against the same environment (e.g. a normal window + an incognito
+   window), logged in as two different users in the same org — admin + one of that org's
+   clients works well.
+2. In one session, trigger a change: approve a milestone, post a comment, or upload a
+   deliverable.
+3. Watch the other session update with no refresh.
+
+This works identically locally (against `supabase start`'s local Realtime) and against a
+deployed environment (staging/production) — realtime is driven by the database, not by
+which frontend host you're on.
+
 ## Environment variables
 
 Each environment (`local`, `staging`, `production`) gets its own env file
