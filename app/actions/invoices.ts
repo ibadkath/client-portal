@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 
 const STATUSES = ["draft", "sent", "paid", "overdue"] as const;
 type Status = (typeof STATUSES)[number];
@@ -22,7 +23,7 @@ export async function updateInvoice(
   }
 
   const supabase = await createClient();
-  const update: Record<string, unknown> = { ...patch };
+  const update: Database["public"]["Tables"]["invoices"]["Update"] = { ...patch };
   if (patch.status === "sent") {
     update.issued_at = new Date().toISOString();
   }

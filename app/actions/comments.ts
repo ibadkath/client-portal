@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 
 export async function addComment(
   projectId: string,
@@ -14,9 +15,12 @@ export async function addComment(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("comments")
-    .insert({ deliverable_id: deliverableId, body });
+  // org_id/author_id are forced by trigger (never trusted from the caller);
+  // the generated Insert type can't express "trigger-populated", hence the cast.
+  const { error } = await supabase.from("comments").insert({
+    deliverable_id: deliverableId,
+    body,
+  } as Database["public"]["Tables"]["comments"]["Insert"]);
 
   if (error) {
     return { error: error.message };

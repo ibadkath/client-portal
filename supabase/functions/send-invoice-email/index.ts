@@ -63,8 +63,8 @@ Deno.serve(async (req) => {
 
   const amount = (amount_cents / 100).toFixed(2);
   const results = await Promise.all(
-    emails.map((to) =>
-      fetch("https://api.resend.com/emails", {
+    emails.map(async (to) => {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${RESEND_API_KEY}`,
@@ -75,15 +75,23 @@ Deno.serve(async (req) => {
           to,
           subject: `Invoice for ${project?.name ?? "your project"} -- milestone approved`,
           html: `<p>The milestone <strong>${milestone?.title ?? milestone_id}</strong> on project <strong>${project?.name ?? ""}</strong> was approved.</p>
-                 <p>A draft invoice (#${invoice_id}) for $${amount} has been created for ${org?.name ?? "your organization"}.</p>`,
+                 <p>A draft invoice for $${amount} has been created for ${org?.name ?? "your organization"}.</p>`,
         }),
-      })
-    )
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        console.error(`Resend send to ${to} failed (${res.status}): ${error}`);
+        return { to, ok: false, status: res.status, error };
+      }
+      return { to, ok: true };
+    })
   );
 
   const sent = results.filter((r) => r.ok).length;
-  return new Response(JSON.stringify({ sent, of: emails.length }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  const errors = results.filter((r) => !r.ok);
+  return new Response(
+    JSON.stringify({ sent, of: emails.length, ...(errors.length > 0 ? { errors } : {}) }),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+  );
 });

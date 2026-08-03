@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 
 // No role branching here on purpose: enforce_milestone_client_update() in
 // supabase/migrations/20260727150000_close_milestone_insert_gap.sql is the
@@ -78,6 +79,8 @@ export async function createMilestone(projectId: string, formData: FormData) {
     .limit(1)
     .maybeSingle();
 
+  // org_id is forced by trigger (never trusted from the caller); the
+  // generated Insert type can't express "trigger-populated", hence the cast.
   const { data, error } = await supabase
     .from("milestones")
     .insert({
@@ -86,7 +89,7 @@ export async function createMilestone(projectId: string, formData: FormData) {
       description: description || null,
       due_date: dueDate || null,
       sequence: (last?.sequence ?? 0) + 1,
-    })
+    } as Database["public"]["Tables"]["milestones"]["Insert"])
     .select();
 
   if (error) {

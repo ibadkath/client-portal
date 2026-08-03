@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 
 // The file itself is uploaded straight from the browser to Supabase
 // Storage (see UploadDeliverableForm in project-board.tsx) -- not routed
@@ -22,11 +23,13 @@ export async function recordDeliverable(
 ) {
   const supabase = await createClient();
 
+  // org_id is forced by trigger (never trusted from the caller); the
+  // generated Insert type can't express "trigger-populated", hence the cast.
   const { error } = await supabase.from("deliverables").insert({
     milestone_id: milestoneId,
     storage_path: path,
     file_name: fileName,
-  });
+  } as Database["public"]["Tables"]["deliverables"]["Insert"]);
   if (error) {
     return { error: error.message };
   }
@@ -47,9 +50,9 @@ export async function getDeliverableDownloadUrl(
 ) {
   const supabase = await createClient();
 
-  const { error: logError } = await supabase
-    .from("deliverable_downloads")
-    .insert({ deliverable_id: deliverableId });
+  const { error: logError } = await supabase.from("deliverable_downloads").insert({
+    deliverable_id: deliverableId,
+  } as Database["public"]["Tables"]["deliverable_downloads"]["Insert"]);
   if (logError) {
     return { error: logError.message };
   }

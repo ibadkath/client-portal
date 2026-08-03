@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/database.types";
 
 // Admin-only end to end: every time_entries RLS policy (select/insert/
 // update/delete) requires is_admin() (supabase/migrations/20260723131336_phase2_rls.sql).
@@ -21,6 +22,8 @@ export async function logTime(projectId: string, formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // org_id is forced by trigger (never trusted from the caller); the
+  // generated Insert type can't express "trigger-populated", hence the cast.
   const { data, error } = await supabase
     .from("time_entries")
     .insert({
@@ -29,7 +32,7 @@ export async function logTime(projectId: string, formData: FormData) {
       hours,
       description: description || null,
       ...(entryDate ? { entry_date: entryDate } : {}),
-    })
+    } as Database["public"]["Tables"]["time_entries"]["Insert"])
     .select();
 
   if (error) {
