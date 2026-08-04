@@ -24,27 +24,51 @@ build notes.
 ## Prerequisites
 
 - Node.js
-- [Supabase CLI](https://supabase.com/docs/guides/cli)
-- Docker Desktop (only needed to run Supabase locally via `supabase start`)
+
+That's it. Docker is **not** required to get a working local environment — see below.
 
 ## Local setup
 
 ```bash
+git clone <repo-url>
+cd client-portal
 npm install
-supabase start        # spins up local Postgres, Auth, Storage, etc.
-supabase db reset      # applies every migration + supabase/seed.sql
+cp .env.local.example .env.local
 npm run dev
 ```
 
-`supabase start` prints a local anon key, service role key, and API URL — put those in
-`.env.local` (see below). `supabase db reset` runs `supabase/seed.sql`, which seeds three
-accounts (password `password123` for all):
+No Supabase project invite, no shared secrets, no asking anyone anything — `.env.local.example`
+is committed on purpose and points at the staging Supabase project, using its public
+anon key (safe to commit; see the comment in that file for why). Staging is already
+seeded with three test accounts (password `password123` for all):
 
 | Email | Role | Org |
 |---|---|---|
 | `admin@example.com` | admin | — |
 | `client@acme.test` | client | Acme Corp |
 | `client@globex.test` | client | Globex Inc |
+
+### Changing schema, RLS, storage policies, or Edge Functions
+
+Only needed for this kind of change — day-to-day feature work doesn't need it. Install
+the [Supabase CLI](https://supabase.com/docs/guides/cli) (no Docker required — these
+commands talk straight to the staging project over the network, not to a local stack):
+
+```bash
+npm run supabase:link:staging   # one-time, links the CLI to staging
+supabase migration new <name>    # creates a SQL file under supabase/migrations
+supabase db push --linked         # applies your new migration(s) to staging
+```
+
+Then run the app against staging as usual (`npm run dev`, using `.env.local` from the
+setup above) to verify the change. Once it looks right, the same `db push --linked`
+(after `npm run supabase:link:production`) applies it to production.
+
+There's a real tradeoff to know about: without a local Docker stack there's no disposable
+"wipe and start over" sandbox — `db push --linked` writes directly to the real, shared
+staging database. A broken migration or policy affects everyone using staging, and there's
+no one-command reset; recovering means writing a fix-forward migration. That's an
+acceptable cost for careful, reviewed schema changes, but worth keeping in mind.
 
 ## Seeing realtime sync
 
@@ -66,15 +90,15 @@ which frontend host you're on.
 ## Environment variables
 
 Each environment (`local`, `staging`, `production`) gets its own env file
-(`.env.local`, `.env.staging`, `.env.production` — all gitignored, never commit real
-values). Required variables:
+(`.env.local`, `.env.staging`, `.env.production` — all gitignored except the committed
+`.env.local.example`, never commit real values beyond that). Variables:
 
 | Variable | Where it's used | Notes |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | client + server | project API URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | client + server | project API URL — the only variable `npm run dev` needs |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client + server | public, ships in the browser bundle by design |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only (`lib/supabase/admin.ts`) | bypasses RLS — never expose to the client |
-| `SUPABASE_DB_PASSWORD` | CLI only (`supabase db query/push --linked`) | not read by the app itself |
+| `SUPABASE_SERVICE_ROLE_KEY` | server only (`lib/supabase/admin.ts`) | bypasses RLS — not required to run the app day to day; only pull this in if you're writing a privileged server action, and never expose it to the client |
+| `SUPABASE_DB_PASSWORD` | CLI only (`supabase db query/push --linked`) | not read by the app itself, and only needed for the migration workflow above |
 | `RESEND_API_KEY` | edge function (`send-invoice-email`) | set via `supabase secrets set`, not a Next.js env var |
 
 ## Migrations
@@ -83,11 +107,12 @@ No schema changes via the dashboard — if it isn't a migration in `supabase/mig
 it doesn't exist.
 
 ```bash
-supabase migration new <name>   # create a new migration
-supabase db reset                # re-apply everything locally
-supabase link --project-ref <ref>
-supabase db push --linked        # apply to staging/production
+supabase migration new <name>          # create a new migration
+npm run supabase:link:staging          # or supabase:link:production
+supabase db push --linked               # apply to staging/production
 ```
+
+See "Changing schema, RLS, storage policies, or Edge Functions" above for the full workflow.
 
 ## Types
 
